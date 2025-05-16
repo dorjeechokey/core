@@ -1,0 +1,55 @@
+name: Quality & Test Checks
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  quality:
+    name: Static Analysis & Tests
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python 3.10
+        uses: actions/setup-python@v4
+        with:
+          python-version: 3.10
+
+      - name: Install dependencies
+        run: |
+          python -m venv .venv
+          source .venv/bin/activate
+          pip install --upgrade pip
+          pip install pylint radon bandit pytest pytest-cov
+
+      - name: Pylint (style & errors)
+        run: |
+          source .venv/bin/activate
+          pylint homeassistant --exit-zero
+
+      - name: Radon Complexity & MI
+        run: |
+          source .venv/bin/activate
+          radon cc homeassistant -s -a
+          radon mi homeassistant
+
+      - name: Bandit Security Scan
+        run: |
+          source .venv/bin/activate
+          bandit -r homeassistant -q
+
+      - name: Run pytest with coverage
+        run: |
+          source .venv/bin/activate
+          pytest --maxfail=1 --disable-warnings --cov=homeassistant --cov-report=term-missing
+
+      - name: Enforce coverage threshold
+        run: |
+          source .venv/bin/activate
+          coverage run -m pytest --quiet
+          coverage report --fail-under=85
